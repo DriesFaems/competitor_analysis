@@ -15,6 +15,7 @@ import datetime
 from streamlit_gsheets import GSheetsConnection
 from crewai_tools import SerperDevTool
 import time
+from pyairtable import Table
 
 
 # create title for the streamlit app
@@ -32,8 +33,13 @@ access = st.text_input('Please enter your WHU email address').lower()
 # Establish connection to Google Sheet
 conn = st.connection("gsheets", type=GSheetsConnection)
 
+AIRTABLE_API_KEY = st.secrets["AIRTABLE_API_KEY"]
+BASE_ID = st.secrets["BASE_ID"]
+TABLE_NAME = st.secrets["TABLE_NAME"]  # Replace with your table name
+
+airtable = Table(AIRTABLE_API_KEY, BASE_ID, TABLE_NAME)
+
 # Read existing data from the sheet
-data = conn.read(worksheet = "Sheet1", ttl=0)
 accessdata = conn.read(worksheet = "Sheet2")
 
 # check if the access code is correct
@@ -77,23 +83,17 @@ else:
         os.environ['SERPER_API_KEY'] = serper_api_key
 
         # Create a new record as a DataFrame
-        new_record = pd.DataFrame({
-            'Timestamp': [datetime.datetime.now()],
-            'User': [access],
-            'Action': ['Clicked on Start Interview'],
-            'Value_Proposition': [value_proposition],
-            'Painpoint': [painpoint],
-            'Target_Market': [target_market],
-            'Unfair_Advantage': [unfair_advantage]
-        })
+        new_record = {
+            'Timestamp': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            'User': access,
+            'Action': 'Clicked on Start Interview',
+            'Value_Proposition': value_proposition,
+            'Painpoint': painpoint,
+            'Target_Market': target_market,
+            'Unfair_Advantage': unfair_advantage
+        }
 
-        # add new record to the DataFrame
-
-        updated_data = pd.concat([data, new_record], ignore_index=True)
-
-        # Write the updated data back to the Google Sheet
-        
-        conn.update(worksheet = "Sheet1", data=updated_data)
+        airtable.create(new_record)
 
         client = Groq()
         GROQ_LLM = ChatGroq(model="llama3-70b-8192")
